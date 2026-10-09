@@ -1,0 +1,994 @@
+---
+title: 'Final Project'
+author: "Goze Hazal Maral, Shaochong Xue"
+output:
+  word_document: default
+  html_document: default
+---
+
+#### Main data work 
+```{r libraries, include=FALSE}
+
+# Require Packages 
+
+pks <- c(
+  "sf","GGally","devtools", "tidyverse","ggthemes",
+  "gt","moments", "dplyr")
+
+invisible(lapply(pks, function(x) if (!require(x, character.only=T)){install.packages(x);library(x, character.only = T)}))
+
+# this is the normal install and load procedure to be able to use st_read
+#install.packages("sf")
+#library(sf)
+
+
+```
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(plm)
+library(GGally)
+library(car)
+library(lmtest)
+library(sandwich)
+library(readxl)
+library(dplyr)  
+```
+
+
+
+```{r chunk1.reading the data, include=FALSE}
+totaldataEUCO2.df <- read_xlsx("Final_EU_Data_Final.xlsx") %>%
+  glimpse()
+totaldataEUCO2.df
+```
+
+```{r chunk2, include=FALSE}
+totaldataEUCO2.df%>%
+  dplyr::group_by(Country)%>%
+  dplyr::count()
+```
+#### Tabels 
+```{r chunk3 Visualization of CO2 per capita over 4 years across EU regions, echo=FALSE}
+ggplot(data=totaldataEUCO2.df, aes(x=Data_Year, y=CO2perCapita, color=Country))+
+  geom_line()+
+  facet_wrap(~CountryGroup)+
+  ylab("Carbon dioxide (CO2) emissions excluding LULUCF per capita (t CO2e/capita)")+
+  theme_bw()+
+  theme(legend.position = "none")+
+  ggtitle("Figure 1: CO2 per Capita across EU regions")
+```
+
+```{r chunk4 visualizes the distribution of per capita CO2 emission over time, echo=FALSE}
+
+totaldataEUCO2.df%>%
+  filter(Data_Year==2018|Data_Year==2019|Data_Year==2020|Data_Year==2021)%>%
+ggplot(aes(x=CO2perCapita, fill=Data_Year))+
+  geom_histogram(col="black")+
+  facet_wrap(Data_Year~., ncol=2)+
+  #scale_x_log10()+
+  xlab("Carbon dioxide (CO2) emissions excluding LULUCF per capita (t CO2e/capita)")+
+  theme_bw()+
+  theme(legend.position = "none")+
+  ggtitle("Figure 2: Annual CO2 emissions per Capita across years.")
+
+
+```
+#### Summary Statistics
+```{r creating WesternEurope data set, include=FALSE}
+# filtering for a single region (WesternEurope)
+WesternEurope.df <- totaldataEUCO2.df %>%
+  filter(CountryGroup == "WesternEurope")
+```
+
+```{r creating SouthernEurope data set, include=FALSE}
+# filtering for a single region (SouthernEurope)
+SouthernEurope.df <- totaldataEUCO2.df %>%
+  filter(CountryGroup == "SouthernEurope")
+```
+
+```{r creating NorthernEurope data set, include=FALSE}
+# filtering for a single region (NorthernEurope)
+NorthernEurope.df <- totaldataEUCO2.df %>%
+  filter(CountryGroup == "NorthernEurope")
+```
+
+```{r creating EasternBlock data set, include=FALSE}
+# filtering for a single region (EasternBlock)
+EasternBlock.df <- totaldataEUCO2.df %>%
+  filter(CountryGroup == "EasternBlock")
+```	
+
+```{r Regional summary statistics, Western Europe, include=FALSE}
+#Vairables: TotalCO2, CO2PerCapita, Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI
+# Summary statistics for TotalCO2
+WE_summary_totalCO2 <- WesternEurope.df %>%
+  summarise(
+    variable = "Total CO2 Emissions",
+    length = n(),
+    min = round(min(TotalCO2, na.rm=TRUE), 4),
+    max = round(max(TotalCO2, na.rm=TRUE), 4),
+    median = round(median(TotalCO2, na.rm=TRUE), 4),
+    mean = round(mean(TotalCO2, na.rm=TRUE), 4),
+    stdev = round(sd(TotalCO2, na.rm=TRUE), 4),
+    q25 = round(quantile(TotalCO2, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(TotalCO2, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(TotalCO2, na.rm=TRUE), 4))
+# Summary statsictics for CO2PerCapita
+WE_summary_CO2PerCapita <- WesternEurope.df %>%
+  summarise(
+    variable = "CO2 Per Capita",
+    length = n(),
+    min = round(min(CO2perCapita, na.rm=TRUE), 4),
+    max = round(max(CO2perCapita, na.rm=TRUE), 4),
+    median = round(median(CO2perCapita, na.rm=TRUE), 4),
+    mean = round(mean(CO2perCapita, na.rm=TRUE), 4),
+    stdev = round(sd(CO2perCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(CO2perCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(CO2perCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(CO2perCapita, na.rm=TRUE), 4))
+# Summary statsictics for Corruption
+WE_summary_Corruption <- WesternEurope.df %>%
+  summarise(
+    variable = "Corruption Index",
+    length = n(),
+    min = round(min(Corruption, na.rm=TRUE), 4),
+    max = round(max(Corruption, na.rm=TRUE), 4),
+    median = round(median(Corruption, na.rm=TRUE), 4),
+    mean = round(mean(Corruption, na.rm=TRUE), 4),
+    stdev = round(sd(Corruption, na.rm=TRUE), 4),
+    q25 = round(quantile(Corruption, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Corruption, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Corruption, na.rm=TRUE), 4))
+# Summary statsictics for EduLevel
+WE_summary_EduLevel <- WesternEurope.df %>%
+  summarise(
+    variable = "Education Level",
+    length = n(),
+    min = round(min(EduLevel, na.rm=TRUE), 4),
+    max = round(max(EduLevel, na.rm=TRUE), 4),
+    median = round(median(EduLevel, na.rm=TRUE), 4),
+    mean = round(mean(EduLevel, na.rm=TRUE), 4),
+    stdev = round(sd(EduLevel, na.rm=TRUE), 4),
+    q25 = round(quantile(EduLevel, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(EduLevel, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(EduLevel, na.rm=TRUE), 4))
+# Summary statsictics for GDPperCapita
+WE_summary_GDPperCapita <- WesternEurope.df %>%
+  summarise(
+    variable = "GDP per Capita",
+    length = n(),
+    min = round(min(GDPperCapita, na.rm=TRUE), 4),
+    max = round(max(GDPperCapita, na.rm=TRUE), 4),
+    median = round(median(GDPperCapita, na.rm=TRUE), ),
+    mean = round(mean(GDPperCapita, na.rm=TRUE), 4),
+    stdev = round(sd(GDPperCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(GDPperCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(GDPperCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(GDPperCapita, na.rm=TRUE), 4))
+# Summary statsictics for Industry
+WE_summary_Industry <- WesternEurope.df %>%
+  summarise(
+    variable = "Industry Construction",
+    length = n(),
+    min = round(min(Industry, na.rm=TRUE), 4),
+    max = round(max(Industry, na.rm=TRUE), 4),
+    median = round(median(Industry, na.rm=TRUE), 4),
+    mean = round(mean(Industry, na.rm=TRUE), 4),
+    stdev = round(sd(Industry, na.rm=TRUE), 4),
+    q25 = round(quantile(Industry, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Industry, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Industry, na.rm=TRUE), 4))
+# Summary statsictics for LaborForce
+WE_summary_LaborForce <- WesternEurope.df %>%
+  summarise(
+    variable = "Labor Force",
+    length = n(),
+    min = round(min(LaborForce, na.rm=TRUE), 4),
+    max = round(max(LaborForce, na.rm=TRUE), 4),
+    median = round(median(LaborForce, na.rm=TRUE), 4),
+    mean = round(mean(LaborForce, na.rm=TRUE), 4),
+    stdev = round(sd(LaborForce, na.rm=TRUE), 4),
+    q25 = round(quantile(LaborForce, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(LaborForce, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(LaborForce, na.rm=TRUE), 4))
+# Summary statsictics for Renewable Energy
+WE_summary_ReneEnergy <- WesternEurope.df %>%
+  summarise(
+    variable = "Renewable Energy",
+    length = n(),
+    min = round(min(ReneEnergy, na.rm=TRUE), 4),
+    max = round(max(ReneEnergy, na.rm=TRUE), 4),
+    median = round(median(ReneEnergy, na.rm=TRUE), 4),
+    mean = round(mean(ReneEnergy, na.rm=TRUE), 4),
+    stdev = round(sd(ReneEnergy, na.rm=TRUE), 4),
+    q25 = round(quantile(ReneEnergy, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(ReneEnergy, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(ReneEnergy, na.rm=TRUE), 4))
+
+# WE CCPI Rank statistics
+WB_total_count <- nrow(WesternEurope.df)  # Total sample size
+WE_CCPI_Rank.counts <- WesternEurope.df %>%
+  group_by(CCPI_Rank) %>%
+  count(CCPI_Rank) %>%
+  mutate(percentage = (n / WB_total_count) * 100)
+
+WE_CCPI_Rank.counts
+  
+# Calculate the total number of observations in the dataset
+WB_total_count <- nrow(WesternEurope.df)
+
+```
+
+```{r WE stats combined, include=FALSE}
+#table first step
+combined.summary.WE <- bind_rows(
+  WE_summary_totalCO2 %>% mutate(variable = "CO2 Emissions Total (Mt CO2e)", CountryGroup = "Western Europe"),
+  WE_summary_CO2PerCapita %>% mutate(variable = "CO2 Emissions per capita (t CO2e/capita)", CountryGroup = "Western Europe"),
+  WE_summary_Corruption %>% mutate(variable = "Control of Corruption: Estimate", CountryGroup = "Western Europe"),
+  WE_summary_EduLevel %>% mutate(variable = "Educational Attainment (Bachelor's or equivalent, population %)", CountryGroup = "Western Europe"),
+  WE_summary_GDPperCapita %>% mutate(variable = "GDP per capita (current US$)", CountryGroup = "Western Europe"),
+  WE_summary_Industry %>% mutate(variable = "Industry (% of GDP)", CountryGroup = "Western Europe"),
+  WE_summary_LaborForce %>% mutate(variable = "Labor Force Participation Rate (% of female population ages 15+)", CountryGroup = "Western Europe"),
+  WE_summary_ReneEnergy %>% mutate(variable = "Renewable energy consumption (% of total final energy consumption)", CountryGroup = "Western Europe")
+)
+combined.summary.WE
+```
+
+```{r WE summary table, echo=FALSE}
+combined.summary.WE %>% 
+  gt() %>%
+  tab_options(
+    table.width = pct(50)
+  ) %>% 
+  cols_width(
+    everything() ~ px(100)
+  ) %>% 
+  tab_header(
+    title = md("Table 1: Summary Statistics for Key Variables for Western Europe")
+  ) %>% 
+  fmt_number(columns = c("length", "mean", "median", "stdev", "skewness", "max", "min", "q25", "q75"), decimals = 1) %>%
+  cols_label(
+    length = "Number of Observations",
+    mean = "Mean",
+    median = "Median",
+    stdev = "Sd",
+    skewness = "Skewness", 
+    max = "Maximum", 
+    min = "Minimum", 
+    q25 = "25th Percentile", 
+    q75 = "75th Percentile"
+  ) %>% 
+  tab_style(
+    style = list(
+      cell_text(align = "center")
+    ),
+    locations = cells_column_labels(everything())
+    )
+```
+
+```{r Regional summary statistics, Eastern Europe, include=FALSE}
+#Vairables: TotalCO2, CO2PerCapita, Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI
+# Summary statistics for TotalCO2
+EE_summary_totalCO2 <- EasternBlock.df %>%
+  summarise(
+    variable = "Total CO2 Emissions",
+    length = n(),
+    min = round(min(TotalCO2, na.rm=TRUE), 4),
+    max = round(max(TotalCO2, na.rm=TRUE), 4),
+    median = round(median(TotalCO2, na.rm=TRUE), 4),
+    mean = round(mean(TotalCO2, na.rm=TRUE), 4),
+    stdev = round(sd(TotalCO2, na.rm=TRUE), 4),
+    q25 = round(quantile(TotalCO2, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(TotalCO2, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(TotalCO2, na.rm=TRUE), 4))
+# Summary statsictics for CO2PerCapita
+EE_summary_CO2PerCapita <- EasternBlock.df %>%
+  summarise(
+    variable = "CO2 Per Capita",
+    length = n(),
+    min = round(min(CO2perCapita, na.rm=TRUE), 4),
+    max = round(max(CO2perCapita, na.rm=TRUE), 4),
+    median = round(median(CO2perCapita, na.rm=TRUE), 4),
+    mean = round(mean(CO2perCapita, na.rm=TRUE), 4),
+    stdev = round(sd(CO2perCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(CO2perCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(CO2perCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(CO2perCapita, na.rm=TRUE), 4))
+# Summary statsictics for Corruption
+EE_summary_Corruption <- EasternBlock.df %>%
+  summarise(
+    variable = "Corruption Index",
+    length = n(),
+    min = round(min(Corruption, na.rm=TRUE), 4),
+    max = round(max(Corruption, na.rm=TRUE), 4),
+    median = round(median(Corruption, na.rm=TRUE), 4),
+    mean = round(mean(Corruption, na.rm=TRUE), 4),
+    stdev = round(sd(Corruption, na.rm=TRUE), 4),
+    q25 = round(quantile(Corruption, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Corruption, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Corruption, na.rm=TRUE), 4))
+# Summary statsictics for EduLevel
+EE_summary_EduLevel <- EasternBlock.df %>%
+  summarise(
+    variable = "Education Level",
+    length = n(),
+    min = round(min(EduLevel, na.rm=TRUE), 4),
+    max = round(max(EduLevel, na.rm=TRUE), 4),
+    median = round(median(EduLevel, na.rm=TRUE), 4),
+    mean = round(mean(EduLevel, na.rm=TRUE), 4),
+    stdev = round(sd(EduLevel, na.rm=TRUE), 4),
+    q25 = round(quantile(EduLevel, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(EduLevel, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(EduLevel, na.rm=TRUE), 4))
+# Summary statsictics for GDPperCapita
+EE_summary_GDPperCapita <- EasternBlock.df %>%
+  summarise(
+    variable = "GDP per Capita",
+    length = n(),
+    min = round(min(GDPperCapita, na.rm=TRUE), 4),
+    max = round(max(GDPperCapita, na.rm=TRUE), 4),
+    median = round(median(GDPperCapita, na.rm=TRUE), ),
+    mean = round(mean(GDPperCapita, na.rm=TRUE), 4),
+    stdev = round(sd(GDPperCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(GDPperCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(GDPperCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(GDPperCapita, na.rm=TRUE), 4))
+# Summary statsictics for Industry
+EE_summary_Industry <- EasternBlock.df %>%
+  summarise(
+    variable = "Industry Construction",
+    length = n(),
+    min = round(min(Industry, na.rm=TRUE), 4),
+    max = round(max(Industry, na.rm=TRUE), 4),
+    median = round(median(Industry, na.rm=TRUE), 4),
+    mean = round(mean(Industry, na.rm=TRUE), 4),
+    stdev = round(sd(Industry, na.rm=TRUE), 4),
+    q25 = round(quantile(Industry, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Industry, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Industry, na.rm=TRUE), 4))
+# Summary statsictics for LaborForce
+EE_summary_LaborForce <- EasternBlock.df %>%
+  summarise(
+    variable = "Labor Force",
+    length = n(),
+    min = round(min(LaborForce, na.rm=TRUE), 4),
+    max = round(max(LaborForce, na.rm=TRUE), 4),
+    median = round(median(LaborForce, na.rm=TRUE), 4),
+    mean = round(mean(LaborForce, na.rm=TRUE), 4),
+    stdev = round(sd(LaborForce, na.rm=TRUE), 4),
+    q25 = round(quantile(LaborForce, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(LaborForce, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(LaborForce, na.rm=TRUE), 4))
+# Summary statsictics for ReneEnergy
+EE_summary_ReneEnergy <- EasternBlock.df %>%
+  summarise(
+    variable = "Renewable Energy",
+    length = n(),
+    min = round(min(ReneEnergy, na.rm=TRUE), 4),
+    max = round(max(ReneEnergy, na.rm=TRUE), 4),
+    median = round(median(ReneEnergy, na.rm=TRUE), 4),
+    mean = round(mean(ReneEnergy, na.rm=TRUE), 4),
+    stdev = round(sd(ReneEnergy, na.rm=TRUE), 4),
+    q25 = round(quantile(ReneEnergy, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(ReneEnergy, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(ReneEnergy, na.rm=TRUE), 4))
+
+# EE CCPI Rank statistics
+EE_total_count <- nrow(EasternBlock.df)  # Total sample size
+EE_CCPI_Rank.counts <- EasternBlock.df %>%
+  group_by(CCPI_Rank) %>%
+  count(CCPI_Rank) %>%
+  mutate(percentage = (n / EE_total_count) * 100)
+
+EE_CCPI_Rank.counts
+  
+# Calculate the total number of observations in the dataset
+EE_total_count <- nrow(EasternBlock.df)
+
+```
+
+```{r EE stats combined, include=FALSE}
+#table first step
+combined.summary.EE <- bind_rows(
+  EE_summary_totalCO2 %>% mutate(variable = "CO2 Emissions Total (Mt CO2e)", CountryGroup = "Former Eastern Block"),
+  EE_summary_CO2PerCapita %>% mutate(variable = "CO2 Emissions per capita (t CO2e/capita)", CountryGroup = "Former Eastern Block"),
+  EE_summary_Corruption %>% mutate(variable = "Control of Corruption: Estimate", CountryGroup = "Former Eastern Block"),
+  EE_summary_EduLevel %>% mutate(variable = "Educational Attainment (Bachelor's or equivalent, population %)", CountryGroup = "Former Eastern Block"),
+  EE_summary_GDPperCapita %>% mutate(variable = "GDP per capita (current US$)", CountryGroup = "Former Eastern Block"),
+  EE_summary_Industry %>% mutate(variable = "Industry (% of GDP)", CountryGroup = "Former Eastern Block"),
+  EE_summary_LaborForce %>% mutate(variable = "Labor Force Participation Rate (% of female population ages 15+)", CountryGroup = "Former Eastern Block"),
+  EE_summary_ReneEnergy %>% mutate(variable = "Renewable energy consumption (% of total final energy consumption)", CountryGroup = "Former Eastern Block")
+)
+combined.summary.EE
+```
+
+```{r EE summary table, echo=FALSE}
+combined.summary.EE %>% 
+  gt() %>%
+  tab_options(
+    table.width = pct(50)
+  ) %>% 
+  cols_width(
+    everything() ~ px(100)
+  ) %>% 
+  tab_header(
+    title = md("Table 2: Summary Statistics for Key Variables for Former Eastern Block")
+  ) %>% 
+  fmt_number(columns = c("length", "mean", "median", "stdev", "skewness", "max", "min", "q25", "q75"), decimals = 1) %>%
+  cols_label(
+    length = "Number of Observations",
+    mean = "Mean",
+    median = "Median",
+    stdev = "Sd",
+    skewness = "Skewness", 
+    max = "Maximum", 
+    min = "Minimum", 
+    q25 = "25th Percentile", 
+    q75 = "75th Percentile"
+  ) %>% 
+  tab_style(
+    style = list(
+      cell_text(align = "center")
+    ),
+    locations = cells_column_labels(everything())
+    )
+```
+
+```{r Regional summary statistics, Northern Europe, include=FALSE}
+#Vairables: TotalCO2, CO2PerCapita, Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI
+# Summary statistics for TotalCO2
+NE_summary_totalCO2 <- NorthernEurope.df %>%
+  summarise(
+    variable = "Total CO2 Emissions",
+    length = n(),
+    min = round(min(TotalCO2, na.rm=TRUE), 4),
+    max = round(max(TotalCO2, na.rm=TRUE), 4),
+    median = round(median(TotalCO2, na.rm=TRUE), 4),
+    mean = round(mean(TotalCO2, na.rm=TRUE), 4),
+    stdev = round(sd(TotalCO2, na.rm=TRUE), 4),
+    q25 = round(quantile(TotalCO2, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(TotalCO2, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(TotalCO2, na.rm=TRUE), 4))
+# Summary statsictics for CO2PerCapita
+NE_summary_CO2PerCapita <- NorthernEurope.df %>%
+  summarise(
+    variable = "CO2 Per Capita",
+    length = n(),
+    min = round(min(CO2perCapita, na.rm=TRUE), 4),
+    max = round(max(CO2perCapita, na.rm=TRUE), 4),
+    median = round(median(CO2perCapita, na.rm=TRUE), 4),
+    mean = round(mean(CO2perCapita, na.rm=TRUE), 4),
+    stdev = round(sd(CO2perCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(CO2perCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(CO2perCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(CO2perCapita, na.rm=TRUE), 4))
+# Summary statsictics for Corruption
+NE_summary_Corruption <- NorthernEurope.df %>%
+  summarise(
+    variable = "Corruption Index",
+    length = n(),
+    min = round(min(Corruption, na.rm=TRUE), 4),
+    max = round(max(Corruption, na.rm=TRUE), 4),
+    median = round(median(Corruption, na.rm=TRUE), 4),
+    mean = round(mean(Corruption, na.rm=TRUE), 4),
+    stdev = round(sd(Corruption, na.rm=TRUE), 4),
+    q25 = round(quantile(Corruption, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Corruption, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Corruption, na.rm=TRUE), 4))
+# Summary statsictics for EduLevel
+NE_summary_EduLevel <- NorthernEurope.df %>%
+  summarise(
+    variable = "Education Level",
+    length = n(),
+    min = round(min(EduLevel, na.rm=TRUE), 4),
+    max = round(max(EduLevel, na.rm=TRUE), 4),
+    median = round(median(EduLevel, na.rm=TRUE), 4),
+    mean = round(mean(EduLevel, na.rm=TRUE), 4),
+    stdev = round(sd(EduLevel, na.rm=TRUE), 4),
+    q25 = round(quantile(EduLevel, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(EduLevel, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(EduLevel, na.rm=TRUE), 4))
+# Summary statsictics for GDPperCapita
+NE_summary_GDPperCapita <- NorthernEurope.df %>%
+  summarise(
+    variable = "GDP per Capita",
+    length = n(),
+    min = round(min(GDPperCapita, na.rm=TRUE), 4),
+    max = round(max(GDPperCapita, na.rm=TRUE), 4),
+    median = round(median(GDPperCapita, na.rm=TRUE), ),
+    mean = round(mean(GDPperCapita, na.rm=TRUE), 4),
+    stdev = round(sd(GDPperCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(GDPperCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(GDPperCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(GDPperCapita, na.rm=TRUE), 4))
+# Summary statsictics for Industry
+NE_summary_Industry <- NorthernEurope.df %>%
+  summarise(
+    variable = "Industry Construction",
+    length = n(),
+    min = round(min(Industry, na.rm=TRUE), 4),
+    max = round(max(Industry, na.rm=TRUE), 4),
+    median = round(median(Industry, na.rm=TRUE), 4),
+    mean = round(mean(Industry, na.rm=TRUE), 4),
+    stdev = round(sd(Industry, na.rm=TRUE), 4),
+    q25 = round(quantile(Industry, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Industry, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Industry, na.rm=TRUE), 4))
+# Summary statsictics for LaborForce
+NE_summary_LaborForce <- NorthernEurope.df %>%
+  summarise(
+    variable = "Labor Force",
+    length = n(),
+    min = round(min(LaborForce, na.rm=TRUE), 4),
+    max = round(max(LaborForce, na.rm=TRUE), 4),
+    median = round(median(LaborForce, na.rm=TRUE), 4),
+    mean = round(mean(LaborForce, na.rm=TRUE), 4),
+    stdev = round(sd(LaborForce, na.rm=TRUE), 4),
+    q25 = round(quantile(LaborForce, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(LaborForce, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(LaborForce, na.rm=TRUE), 4))
+# Summary statsictics for ReneEnergy
+NE_summary_ReneEnergy <- NorthernEurope.df %>%
+  summarise(
+    variable = "Renewable Energy",
+    length = n(),
+    min = round(min(ReneEnergy, na.rm=TRUE), 4),
+    max = round(max(ReneEnergy, na.rm=TRUE), 4),
+    median = round(median(ReneEnergy, na.rm=TRUE), 4),
+    mean = round(mean(ReneEnergy, na.rm=TRUE), 4),
+    stdev = round(sd(ReneEnergy, na.rm=TRUE), 4),
+    q25 = round(quantile(ReneEnergy, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(ReneEnergy, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(ReneEnergy, na.rm=TRUE), 4))
+
+# EE CCPI Rank statistics
+NE_total_count <- nrow(NorthernEurope.df)  # Total sample size
+NE_CCPI_Rank.counts <- NorthernEurope.df %>%
+  group_by(CCPI_Rank) %>%
+  count(CCPI_Rank) %>%
+  mutate(percentage = (n / NE_total_count) * 100)
+
+NE_CCPI_Rank.counts
+  
+# Calculate the total number of observations in the dataset
+NE_total_count <- nrow(NorthernEurope.df)
+
+```
+
+```{r NE stats combined, include=FALSE}
+#table first step
+combined.summary.NE <- bind_rows(
+  NE_summary_totalCO2 %>% mutate(variable = "CO2 Emissions Total (Mt CO2e)", CountryGroup = "Northern Europe"),
+  NE_summary_CO2PerCapita %>% mutate(variable = "CO2 Emissions per capita (t CO2e/capita)", CountryGroup = "Northern Europe"),
+  NE_summary_Corruption %>% mutate(variable = "Control of Corruption: Estimate", CountryGroup = "Northern Europe"),
+  NE_summary_EduLevel %>% mutate(variable = "Educational Attainment (Bachelor's or equivalent, population %)", CountryGroup = "Northern Europe"),
+  NE_summary_GDPperCapita %>% mutate(variable = "GDP per capita (current US$)", CountryGroup = "Northern Europe"),
+  NE_summary_Industry %>% mutate(variable = "Industry (% of GDP)", CountryGroup = "Northern Europe"),
+  NE_summary_LaborForce %>% mutate(variable = "Labor Force Participation Rate (% of female population ages 15+)", CountryGroup = "Northern Europe"),
+  NE_summary_ReneEnergy %>% mutate(variable = "Renewable energy consumption (% of total final energy consumption)", CountryGroup = "Northern Europe")
+)
+combined.summary.NE
+```
+
+```{r NE summary table, echo=FALSE}
+combined.summary.NE %>% 
+  gt() %>%
+  tab_options(
+    table.width = pct(50)
+  ) %>% 
+  cols_width(
+    everything() ~ px(100)
+  ) %>% 
+  tab_header(
+    title = md("Table 3: Summary Statistics for Key Variables for Northern Europe")
+  ) %>% 
+  fmt_number(columns = c("length", "mean", "median", "stdev", "skewness", "max", "min", "q25", "q75"), decimals = 1) %>%
+  cols_label(
+    length = "Number of Observations",
+    mean = "Mean",
+    median = "Median",
+    stdev = "Sd",
+    skewness = "Skewness", 
+    max = "Maximum", 
+    min = "Minimum", 
+    q25 = "25th Percentile", 
+    q75 = "75th Percentile"
+  ) %>% 
+  tab_style(
+    style = list(
+      cell_text(align = "center")
+    ),
+    locations = cells_column_labels(everything())
+    )
+```
+
+```{r Regional summary statistics, Sourthern Europe, include=FALSE}
+#Vairables: TotalCO2, CO2PerCapita, Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI
+# Summary statistics for TotalCO2
+SE_summary_totalCO2 <- SouthernEurope.df %>%
+  summarise(
+    variable = "Total CO2 Emissions",
+    length = n(),
+    min = round(min(TotalCO2, na.rm=TRUE), 4),
+    max = round(max(TotalCO2, na.rm=TRUE), 4),
+    median = round(median(TotalCO2, na.rm=TRUE), 4),
+    mean = round(mean(TotalCO2, na.rm=TRUE), 4),
+    stdev = round(sd(TotalCO2, na.rm=TRUE), 4),
+    q25 = round(quantile(TotalCO2, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(TotalCO2, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(TotalCO2, na.rm=TRUE), 4))
+# Summary statsictics for CO2PerCapita
+SE_summary_CO2PerCapita <- SouthernEurope.df %>%
+  summarise(
+    variable = "CO2 Per Capita",
+    length = n(),
+    min = round(min(CO2perCapita, na.rm=TRUE), 4),
+    max = round(max(CO2perCapita, na.rm=TRUE), 4),
+    median = round(median(CO2perCapita, na.rm=TRUE), 4),
+    mean = round(mean(CO2perCapita, na.rm=TRUE), 4),
+    stdev = round(sd(CO2perCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(CO2perCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(CO2perCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(CO2perCapita, na.rm=TRUE), 4))
+# Summary statsictics for Corruption
+SE_summary_Corruption <- SouthernEurope.df %>%
+  summarise(
+    variable = "Corruption Index",
+    length = n(),
+    min = round(min(Corruption, na.rm=TRUE), 4),
+    max = round(max(Corruption, na.rm=TRUE), 4),
+    median = round(median(Corruption, na.rm=TRUE), 4),
+    mean = round(mean(Corruption, na.rm=TRUE), 4),
+    stdev = round(sd(Corruption, na.rm=TRUE), 4),
+    q25 = round(quantile(Corruption, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Corruption, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Corruption, na.rm=TRUE), 4))
+# Summary statsictics for EduLevel
+SE_summary_EduLevel <- SouthernEurope.df %>%
+  summarise(
+    variable = "Education Level",
+    length = n(),
+    min = round(min(EduLevel, na.rm=TRUE), 4),
+    max = round(max(EduLevel, na.rm=TRUE), 4),
+    median = round(median(EduLevel, na.rm=TRUE), 4),
+    mean = round(mean(EduLevel, na.rm=TRUE), 4),
+    stdev = round(sd(EduLevel, na.rm=TRUE), 4),
+    q25 = round(quantile(EduLevel, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(EduLevel, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(EduLevel, na.rm=TRUE), 4))
+# Summary statsictics for GDPperCapita
+SE_summary_GDPperCapita <- SouthernEurope.df %>%
+  summarise(
+    variable = "GDP per Capita",
+    length = n(),
+    min = round(min(GDPperCapita, na.rm=TRUE), 4),
+    max = round(max(GDPperCapita, na.rm=TRUE), 4),
+    median = round(median(GDPperCapita, na.rm=TRUE), ),
+    mean = round(mean(GDPperCapita, na.rm=TRUE), 4),
+    stdev = round(sd(GDPperCapita, na.rm=TRUE), 4),
+    q25 = round(quantile(GDPperCapita, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(GDPperCapita, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(GDPperCapita, na.rm=TRUE), 4))
+# Summary statsictics for Industry
+SE_summary_Industry <- SouthernEurope.df %>%
+  summarise(
+    variable = "Industry Construction",
+    length = n(),
+    min = round(min(Industry, na.rm=TRUE), 4),
+    max = round(max(Industry, na.rm=TRUE), 4),
+    median = round(median(Industry, na.rm=TRUE), 4),
+    mean = round(mean(Industry, na.rm=TRUE), 4),
+    stdev = round(sd(Industry, na.rm=TRUE), 4),
+    q25 = round(quantile(Industry, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(Industry, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(Industry, na.rm=TRUE), 4))
+# Summary statsictics for LaborForce
+SE_summary_LaborForce <- SouthernEurope.df %>%
+  summarise(
+    variable = "Labor Force",
+    length = n(),
+    min = round(min(LaborForce, na.rm=TRUE), 4),
+    max = round(max(LaborForce, na.rm=TRUE), 4),
+    median = round(median(LaborForce, na.rm=TRUE), 4),
+    mean = round(mean(LaborForce, na.rm=TRUE), 4),
+    stdev = round(sd(LaborForce, na.rm=TRUE), 4),
+    q25 = round(quantile(LaborForce, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(LaborForce, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(LaborForce, na.rm=TRUE), 4))
+# Summary statsictics for ReneEnergy
+SE_summary_ReneEnergy <- SouthernEurope.df %>%
+  summarise(
+    variable = "Renewable Energy",
+    length = n(),
+    min = round(min(ReneEnergy, na.rm=TRUE), 4),
+    max = round(max(ReneEnergy, na.rm=TRUE), 4),
+    median = round(median(ReneEnergy, na.rm=TRUE), 4),
+    mean = round(mean(ReneEnergy, na.rm=TRUE), 4),
+    stdev = round(sd(ReneEnergy, na.rm=TRUE), 4),
+    q25 = round(quantile(ReneEnergy, 0.25, na.rm=TRUE), 4),
+    q75 = round(quantile(ReneEnergy, 0.75, na.rm=TRUE), 4),
+    skewness = round(skewness(ReneEnergy, na.rm=TRUE), 4))
+
+# EE CCPI Rank statistics
+SE_total_count <- nrow(SouthernEurope.df)  # Total sample size
+SE_CCPI_Rank.counts <- SouthernEurope.df %>%
+  group_by(CCPI_Rank) %>%
+  count(CCPI_Rank) %>%
+  mutate(percentage = (n / SE_total_count) * 100)
+
+SE_CCPI_Rank.counts
+  
+# Calculate the total number of observations in the dataset
+SE_total_count <- nrow(SouthernEurope.df)
+
+```
+
+```{r SE stats combined, include=FALSE}
+#table first step
+combined.summary.SE <- bind_rows(
+  SE_summary_totalCO2 %>% mutate(variable = "CO2 Emissions Total (Mt CO2e)", CountryGroup = "Southern Europe"),
+  SE_summary_CO2PerCapita %>% mutate(variable = "CO2 Emissions per capita (t CO2e/capita)", CountryGroup = "Southern Europe"),
+  SE_summary_Corruption %>% mutate(variable = "Control of Corruption: Estimate", CountryGroup = "Southern Europe"),
+  SE_summary_EduLevel %>% mutate(variable = "Educational Attainment (Bachelor's or equivalent, population %)", CountryGroup = "Southern Europe"),
+  SE_summary_GDPperCapita %>% mutate(variable = "GDP per capita (current US$)", CountryGroup = "Southern Europe"),
+  SE_summary_Industry %>% mutate(variable = "Industry (% of GDP)", CountryGroup = "Southern Europe"),
+  SE_summary_LaborForce %>% mutate(variable = "Labor Force Participation Rate (% of female population ages 15+)", CountryGroup = "Southern Europe"),
+  SE_summary_ReneEnergy %>% mutate(variable = "Renewable energy consumption (% of total final energy consumption)", CountryGroup = "Southern Europe")
+)
+combined.summary.SE
+```
+
+```{r SE summary table, echo=FALSE}
+combined.summary.SE %>% 
+  gt() %>%
+  tab_options(
+    table.width = pct(50)
+  ) %>% 
+  cols_width(
+    everything() ~ px(100)
+  ) %>% 
+  tab_header(
+    title = md("Table 4: Summary Statistics for Key Variables for Southern Europe")
+  ) %>% 
+  fmt_number(columns = c("length", "mean", "median", "stdev", "skewness", "max", "min", "q25", "q75"), decimals = 1) %>%
+  cols_label(
+    length = "Number of Observations",
+    mean = "Mean",
+    median = "Median",
+    stdev = "Sd",
+    skewness = "Skewness", 
+    max = "Maximum", 
+    min = "Minimum", 
+    q25 = "25th Percentile", 
+    q75 = "75th Percentile"
+  ) %>% 
+  tab_style(
+    style = list(
+      cell_text(align = "center")
+    ),
+    locations = cells_column_labels(everything())
+    )
+```
+
+#### Scatter Plot Matrix 
+```{r scatterplot 1, echo=FALSE}
+#Main Vairable: CO2PerCapita
+#Explanotary Vairables: Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI, CCPI_Rank, CountryGroup, Former_Eastern_Block_Country, Year_Join_EU
+
+#Scatterplot 1: Corruption, Democracy_Index, CO2PerCapita
+#Scatterplot 2: CountryGroup, Former_Eastern_Block_Country, Year_Join_EU, CO2PerCapita
+#Scatterplot 3: EduLevel, SchoolEnr, UrbPop, CO2PerCapita
+#Scatterplot 4: GDPperCapita, LaborForce, Industry, CO2PerCapita
+#Scatterplot 5: ReneEnergy, CCPI, CCPI_Rank, CO2PerCapita
+
+# selecting only the columns that have key variables for the scatterplot matrix
+EU_scatterplot_1 <- totaldataEUCO2.df %>%
+  select(Corruption, Democracy_Index, CO2perCapita)
+
+# creating the scatterplot matrix with only the selected columns
+ggpairs(EU_scatterplot_1, title = "Figure 3: Scatterplot Matrix for EU Comparison", axisLabels = "show")
+```
+```{r scatterplot 2, echo=FALSE}
+#Main Vairable: CO2PerCapita
+#Explanotary Vairables: Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI, CCPI_Rank, CountryGroup, Former_Eastern_Block_Country, Year_Join_EU
+
+#Scatterplot 1: Corruption, Democracy_Index, CO2PerCapita
+#Scatterplot 2: CountryGroup, Former_Eastern_Block_Country, Year_Join_EU, CO2PerCapita
+#Scatterplot 3: EduLevel, SchoolEnr, UrbPop, CO2PerCapita
+#Scatterplot 4: GDPperCapita, LaborForce, Industry, CO2PerCapita
+#Scatterplot 5: ReneEnergy, CCPI, CCPI_Rank, CO2PerCapita
+
+# selecting only the columns that have key variables for the scatterplot matrix
+EU_scatterplot_2 <- totaldataEUCO2.df %>%
+  select(CountryGroup, Year_Join_EU, CO2perCapita)
+
+# creating the scatterplot matrix with only the selected columns
+ggpairs(EU_scatterplot_2, title = "Figure 4: Scatterplot Matrix for EU", axisLabels = "show")
+```
+```{r scatterplot 3, echo=FALSE}
+#Main Vairable: CO2PerCapita
+#Explanotary Vairables: Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI, CCPI_Rank, CountryGroup, Former_Eastern_Block_Country, Year_Join_EU
+
+#Scatterplot 1: Corruption, Democracy_Index, CO2PerCapita
+#Scatterplot 2: CountryGroup, Former_Eastern_Block_Country, Year_Join_EU, CO2PerCapita
+#Scatterplot 3: EduLevel, SchoolEnr, UrbPop, CO2PerCapita
+#Scatterplot 4: GDPperCapita, LaborForce, Industry, CO2PerCapita
+#Scatterplot 5: ReneEnergy, CCPI, CCPI_Rank, CO2PerCapita
+
+# selecting only the columns that have key variables for the scatterplot matrix
+EU_scatterplot_3 <- totaldataEUCO2.df %>%
+  select(EduLevel, SchoolEnr, UrbPOP, CO2perCapita)
+
+# creating the scatterplot matrix with only the selected columns
+ggpairs(EU_scatterplot_3, title = "Figure 5: Scatterplot Matrix for EU", axisLabels = "show")
+```
+```{r scatterplot 4, echo=FALSE}
+#Main Vairable: CO2PerCapita
+#Explanotary Vairables: Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI, CCPI_Rank, CountryGroup, Former_Eastern_Block_Country, Year_Join_EU
+
+#Scatterplot 1: Corruption, Democracy_Index, CO2PerCapita
+#Scatterplot 2: CountryGroup, Former_Eastern_Block_Country, Year_Join_EU, CO2PerCapita
+#Scatterplot 3: EduLevel, SchoolEnr, UrbPop, CO2PerCapita
+#Scatterplot 4: GDPperCapita, LaborForce, Industry, CO2PerCapita
+#Scatterplot 5: ReneEnergy, CCPI, CCPI_Rank, CO2PerCapita
+
+# selecting only the columns that have key variables for the scatterplot matrix
+EU_scatterplot_4 <- totaldataEUCO2.df %>%
+  select(GDPperCapita, LaborForce, Industry, CO2perCapita)
+
+# creating the scatterplot matrix with only the selected columns
+ggpairs(EU_scatterplot_4, title = "Figure 6: Scatterplot Matrix for EU", axisLabels = "show")
+```
+```{r scatterplot 5, echo=FALSE}
+#Main Vairable: CO2PerCapita
+#Explanotary Vairables: Corruption, EduLevel, GDPperCapita, Industry, LaborForce, ReneEnergy, SchoolEnr, UrbPop, Democracy_Index, CCPI, CCPI_Rank, CountryGroup, Former_Eastern_Block_Country, Year_Join_EU
+
+#Scatterplot 1: Corruption, Democracy_Index, CO2PerCapita
+#Scatterplot 2: CountryGroup, Former_Eastern_Block_Country, Year_Join_EU, CO2PerCapita
+#Scatterplot 3: EduLevel, SchoolEnr, UrbPop, CO2PerCapita
+#Scatterplot 4: GDPperCapita, LaborForce, Industry, CO2PerCapita
+#Scatterplot 5: ReneEnergy, CCPI, CCPI_Rank, CO2PerCapita
+
+# selecting only the columns that have key variables for the scatterplot matrix
+EU_scatterplot_5 <- totaldataEUCO2.df %>%
+  select(ReneEnergy, CCPI, CCPI_Rank, CO2perCapita)
+
+# creating the scatterplot matrix with only the selected columns
+ggpairs(EU_scatterplot_5, title = "Figure 7: Scatterplot Matrix for EU", axisLabels = "show")
+```
+#### Data Logging: 
+```{r log transformation, include=FALSE}
+# Apply log1p transformation to specified variables
+totaldataEUCO2.df <- totaldataEUCO2.df %>%
+  mutate(
+    log_GDPperCapita = log1p(GDPperCapita),  # Log-transform GDP per capita
+    log_CO2perCapita = log1p(CO2perCapita),  # Log-transform CO2 per capita
+    log_EduLevel = log1p(EduLevel),          # Log-transform education level
+    log_ReneEnergy = log1p(ReneEnergy),      # Log-transform renewable energy
+    log_CCPI = log1p(CCPI)                   # Log-transform CCPI
+  )
+```
+GDPperCapita: Has a skewed distrbution therefore logging it would help.
+CO2perCapita: Has a skewed distrbution therefore logging it would help.
+EduLevel: Has a skewed distrbution therefore logging it would help.
+ReneEnergy: Has a skewed distrbution therefore logging it would help. 
+CCPI: Has a skewed distrbution therefore logging it would help.
+Further explanation needed
+
+
+
+### model 2
+
+```{r model 2, echo=FALSE}
+model.2 <-lm(log_CO2perCapita ~ log_EduLevel + log_GDPperCapita + Industry + LaborForce + log_ReneEnergy  + UrbPOP + Democracy_Index + CCPI + factor(Country) - 1, 
+     data = totaldataEUCO2.df, na.action = na.exclude)
+
+summary(model.2)
+```
+
+```{r bptest model.2, echo=FALSE}
+lmtest::bptest(model.2) 
+```
+
+```{r chunk15, echo=FALSE}
+bptest(model.2)
+vif(model.2)
+
+plot(model.2)
+```
+
+Using Country as panel data, we constructed a multi-linear model. During the model development process, it was found that the variables CountryGroup and CCPI_Rate had aliased coefficients, thus they were removed. The analysis results indicate three significant predictors of log_CO2perCapita: log_GDPperCapita, log_ReneEnergy, and UrbPOP.
+
+The assumptions of the model were tested as follows:
+
+Linearity: The Residuals vs. Fitted Plot shows that the residuals are evenly distributed around zero without any obvious pattern, suggesting that the linearity assumption is largely satisfied.
+
+Homoscedasticity: The Breusch-Pagan test result (BP = 56.655, p < 0.05) indicates that the model has significant heteroscedasticity.
+
+Normality: The Q-Q plot indicates that most residuals follow the diagonal line, with only slight deviations in the tails. The residuals are approximately follow a normal distribution.
+
+Multicollinearity: The GVIF values of all variables in the model are relatively high, probably due to the introduction of excessive dummy variables from factor(Country), resulting in overfitting.
+
+Influential Observations: The Cook’s Distance plot identifies a few potentially influential points, such as observations 29, 32, and 81.
+
+Based on these findings, a Fixed Effects Model with robust standard errors was constructed to address the heteroscedasticity and improve the reliability of the results.
+
+
+### model 3
+
+```{r chunk16, echo=FALSE}
+pdata <- pdata.frame(totaldataEUCO2.df, index=c("Country","Data_Year"))
+
+
+model.3 <-plm(log_CO2perCapita ~ log_EduLevel + log_GDPperCapita + Industry + LaborForce + log_ReneEnergy + UrbPOP + Democracy_Index + CCPI, 
+     data = pdata, model="within", effect="individual")
+
+summary(model.3)
+
+coeftest(model.3, vcov = vcovHC, method="arellano", type = "HC1") 
+
+```
+The results of the Fixed Effects Model analysis show that the significant explanatory variables remain unchanged: log_GDPperCapita, log_ReneEnergy, and UrbPOP. Specifically:
+
+Every 1% increase in GDP per capita is associated with a 0.22% increase in CO2 emission per capita.
+Every 1% increase in Renewable Energy proportion is associated with a 0.74% decrease in CO2 emission per capita.
+Every 1% increase in Urban Population proportion is associated with a 0.08% decrease in CO2 emission per capita.
+
+While Educational attainment, industry value-added proportion, female labor force participation rate, school enrollment gender parity index, democracy index, and CCPI were not found to have a significant relationship with CO2 emissions per capita.
+
+
+### Difference test
+
+```{r,include=FALSE}
+diff_test_data <- totaldataEUCO2.df %>%
+  filter(CountryGroup != "Europe")
+
+head(diff_test_data)
+```
+
+
+```{r shapiro,include=FALSE}
+shapiro_test <- diff_test_data %>%
+  group_by(CountryGroup) %>%
+  summarise(p_value = shapiro.test(CO2perCapita)$p.value)
+print(shapiro_test)
+```
+
+```{r Kruskal-Wallis test, echo=FALSE}
+kruskal.test(CO2perCapita ~ CountryGroup, data = diff_test_data)
+
+```
+```{r, echo=FALSE}
+library(FSA)
+
+dunnTest(CO2perCapita ~ CountryGroup, data = diff_test_data, method = "bonferroni")
+
+```
+
+
+
+
+### Discussion
+
+In conclusion, the final model used in this study demonstrates robust performance and effectively explains some of the factors influencing CO2 emission per capita among EU countries between 2018 and 2022.
+
+The analysis reveals that an increase in GDP per capita leads to higher CO2 emissions. However, as suggested by Cole et al. (1997), the relationship between GDP and CO2 emissions may not be strictly linear but rather exhibit an U-shaped curve. This indicates that the current model may have limitations in capturing potential non-linear relationships. The proportion of renewable energy usage shows the most significant negative correlation with CO₂ emissions per capita, with the largest coefficient among all variables. This highlights the crucial role of renewable energy in reducing carbon emissions. Surprisingly, the proportion of urban population is negatively correlated with CO2 emissions per capita. This may be due to the higher energy efficiency resulting from concentrated production and living activities in urban regions.
+
+On the other hand, several variables were found to have no significant effect on CO₂ emissions per capita. Educational attainment, gender equality, and democracy levels showed no significant impact, probably because their effects are masked by other variables in the model. The insignificance of the industry value added proportion may result from the variable reflecting only the proportion of industrial activities within the economy, without accounting for the internal structure of the industrial sector. Notably, the Climate Change Performance Index (CCPI) was also not a significant factor. This could be due to a gap between policy formulation and implementation efficiency or differences in baseline CO2 emissions across countries.
+
+This study also has several limitations. For example, differences in CO2 emissions per capita across country groups likely exist. However, due to the aliased collinearity with other variables, it was excluded from the model. Future exploration could an examine a separate difference test. Additionally, data limitations for some variables restricted the sample period to 2018–2022, resulting in a relatively small sample size. Thus, some conclusions might be constrained. Furthermore, as observed in Figures 1 and 2, CO2 emission per capita across countries significantly declined in 2020, likely due to the impacts of the COVID-19 pandemic. The specific mechanisms and long-term implications of this effect calls for further investigation.
+
+### Citation
+
+1. Cole, M. A., Rayner, A. J., & Bates, J. M. (1997). The environmental Kuznets curve: An empirical analysis. Environment and Development Economics, 2(4), 401-416. https://doi.org/10.1017/S1355770X97000211
+
+
+
+
+
+
+
